@@ -1,0 +1,58 @@
+---
+- hosts: db_servers
+  environment:
+    SECRETHUB_CREDENTIAL: "{{ lookup('env', 'SECRETHUB_CREDENTIAL') }}"
+  tasks:
+    - name: "Ensure the SecretHub CLI is installed"
+      secrethub_cli:
+    - name: "Read database root user"
+      secrethub_read:
+        path: ansible-demo/infra/postgres/root_user
+      register: db_root_user
+    - name: "Read database root password"
+      secrethub_read:
+        path: ansible-demo/infra/postgres/root_pass
+      register: db_root_pass
+    - name: "Generate a database username for the app"
+      secrethub_generate:
+        path: ansible-demo/infra/app/db_user
+      register: db_user
+    - name: "Generate a database password for the app"
+      secrethub_generate:
+        path: ansible-demo/infra/app/db_pass
+      register: db_pass
+    - name: "Create a database user for the app"
+      postgresql_user:
+        db: app
+        name: "{{ db_user.secret }}"
+        password: "{{ db_pass.secret }}"
+        login_user: "{{ db_root_user.secret }}"
+        login_password: "{{ db_root_pass.secret }}"
+        state: present
+        priv: characters:select
+- hosts: web_servers
+  environment:
+    SECRETHUB_CREDENTIAL: "{{ lookup('env', 'SECRETHUB_CREDENTIAL') }}"
+  tasks:
+    - name: "Ensure the SecretHub CLI is installed"
+      secrethub_cli:
+    - name: "Read the app's database user"
+      secrethub_read:
+        path: ansible-demo/infra/app/db_user
+      register: db_user
+    - name: "Read the app's database password"
+      secrethub_read:
+        path: ansible-demo/infra/app/db_pass
+      register: db_pass
+    - name: "Read the app's slack_token"
+      secrethub_read:
+        path: ansible-demo/infra/app/slack_token
+      register: slack_token
+    - name: "Start the app with secrets"
+      shell: "server"
+      environment:
+        DB_HOST: "{{ db_server }}"
+        DB_NAME: app
+        DB_USER: "{{ db_user.secret }}"
+        DB_PASSWORD: "{{ db_pass.secret }}"
+        SLACK_TOKEN: "{{ slack_token.secret }}"
