@@ -1,0 +1,25 @@
+---
+- hosts: db_servers
+  tasks:
+    - include_vars: admin_vault.yml
+    - include_vars: dev_vault.yml
+    - name: "Create a database user for the app"
+      postgresql_user:
+        db: app
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        login_user: "{{ root_user }}"
+        login_password: "{{ root_pass }}"
+        state: present
+        priv: characters:select
+- hosts: web_servers
+  tasks:
+    - include_vars: dev_vault.yml
+    - name: "Start the app with secrets"
+      shell: "server"
+      environment:
+        DB_HOST: "{{ db_server }}"
+        DB_NAME: app
+        DB_USER: "{{ db_user }}"
+        DB_PASSWORD: "{{ db_pass }}"
+        SLACK_TOKEN: "{{ slack_token }}"
